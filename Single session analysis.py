@@ -13,14 +13,12 @@ subList = ['ENGLISH', 'KISWA', 'MATHS', 'HYGIENE', 'ENVIRON', 'C.R.E', 'ACM']
 BaskFont = r'C:\Users\ILMBL\AppData\Local\Microsoft\Windows\Fonts\Baskerville-Regular.ttf'
 CalFont = r'C:\Windows\Fonts\Calibri.ttf'
 NumStudents = 26
-files = ['1 RED OPENER TERM 1 2022','1 RED MID TERM 1 2022'] 
 positionVariance = ['PSTN','POSITION']
 NameCol = 'NAME'                                                            # Variable to store the name column
-file = files[1]
-studPosition = positionVariance[1]
+file = ("1 RED OPENER TERM 1 2022")
+studPosition = positionVariance[0]
 
-# Title data collection
-print(len(file.split()))
+# Getting data from filename to be used in pdf
 grade, gcolor, session, term, termNum, year = file.split()
 gcolor = gcolor.capitalize()
 session = session.capitalize()
@@ -30,59 +28,35 @@ term = term + ' ' + termNum
 file = f'C:/Users/ILMBL/Documents/Projects/Programing/Python/Source file\{file}.xlsx'
 print(grade, gcolor, session, term, termNum, year, file, sep="\n")
 
-# Directory setup
+# Setting up the directories to store the final pdf's and the graphs used in them
 Pdfdir = f'PDFs {grade} {session} {term} {year}/'
 Datadir = f'Data {grade} {session} {term} {year}/'
-PdfdirExist = os.path.exists(Pdfdir)
-DatadirExist = os.path.exists(Datadir)
-if not PdfdirExist:
-    # Create a new directory because it does not exist 
-    os.makedirs(Pdfdir)
+if not os.path.exists(Pdfdir): os.makedirs(Pdfdir)       # Create a new directory because it does not exist 
+if not os.path.exists(Datadir): os.makedirs(Datadir)     # Create a new directory because it does not exist 
 
-if not DatadirExist:
-    # Create a new directory because it does not exist 
-    os.makedirs(Datadir)
-
-# Import data using pandas
+# Convert excel file into a pandas database and clean it
 data = pd.read_excel(file)                                                  # All data from the original excel spreadsheet
 data.columns = data.columns.str.strip()                                     # Remove whitespace from column names
-cleanData = data.drop(data.index[0])
-
-# cleanData = cleanData.head(NumStudents)                                          # Dataframe containing only the data for each student data
-if not(subList[6] in cleanData.columns ):
-    cleanData.loc[:,subList[6]] = 0
+cleanData = data.drop(data.index[0])                                        # Remove first "OUT OFF" row
+if not(subList[6] in cleanData.columns ): cleanData.loc[:,subList[6]] = 0   # Adding column for calculated subject if it doesn't exist
 studentData = cleanData[subList]                                            # Dataframe containing only the marks for each student
-print(cleanData)
-# studentProfile = cleanData[cleanData[NameCol] == 'ELLA BAYARDE ESSOME']   # Table only containind 1 row of data based on the name provided
-students = cleanData.NAME                                                   # list of items on the column Name (As a series)
-headval = cleanData[NameCol] == "TOTAL"
-headval = cleanData.loc[cleanData[NameCol] == "TOTAL", :].index
-print('***', "this is head val ", headval, '***')
 
-def hex_to_rgb(value):
+def hex_to_rgb(value):          # Function to convert a hex value to rgb
     value = value.lstrip('#')
     lv = len(value)
     return tuple(int(value[i:i + lv // 3], 16) for i in range(0, lv, lv // 3))
 Purple1 = hex_to_rgb('#f2cadf')
-print(Purple1, "\n\n\n")
-print(cleanData)
 
-# Setting the total marks and average for each student
+# Calculating student total, average and ACM
 for i in range(NumStudents) :
-    fullNames = cleanData.iloc[i,0]                                            # Name for specific student
-    cleanData = cleanData.set_index(NameCol)                                   # Setting index
-
-    # Adding values ot ACM
-    art = cleanData.loc[fullNames,'ART/MUSIC'] # Get the art score
-    psycho = cleanData.loc[fullNames,'PSYCHO'] # Get the Pscho score
-    acm = art + psycho
-    cleanData.loc[fullNames, 'ACM'] = acm
+    fullNames = cleanData.iloc[i,0]                                            # Get student names on column 0 row i
+    cleanData = cleanData.set_index(NameCol)                                   # Setting the name column as the index
+    # Calculating ACM
+    cleanData.loc[fullNames, 'ACM'] = cleanData.loc[fullNames,'ART/MUSIC'] + cleanData.loc[fullNames,'PSYCHO'] # Combine art and psycho score and put it into the ACM column
     studentData = cleanData[subList]
-
-    totalMarks = studentData.iloc[i].sum()                                     # Total marks for the list of subects provide
-    averageMarks = round(studentData.iloc[i].mean())                                  # Average marks using the mean function
-    cleanData.loc[fullNames, 'Total Marks'] = totalMarks
-    cleanData.loc[fullNames, 'Average'] = averageMarks
+    # Calculating total marks and average for a student
+    cleanData.loc[fullNames, 'Total Marks'] = studentData.iloc[i].sum()     # Sum the values in a row to get the total marks and insert the result in the total marks column
+    cleanData.loc[fullNames, 'Average'] = round(studentData.iloc[i].mean())     # same as above but for mean
     cleanData = cleanData.reset_index(NameCol)                   # Re-setting index
 
 # Finding the class average for each subject
@@ -107,7 +81,7 @@ displayData = []
 
 
 # ----------------------------------------------------------------------Creating student PDF---------------------------------------------------------------------------------------
-for j in range(2) :
+for j in range(0) :
     plt.rcParams['font.size'] = 24
     # Student data to use for each PDF--------------------------------------------------------------
     print('student number: {}'.format(j))
@@ -126,7 +100,7 @@ for j in range(2) :
     subjects = studentData.iloc[j]
     
     plt.rcParams['font.size'] = 40
-    # Bar chart data------------------------------------------------------------
+    # -------------------------------------------------------------------------Bar chart data---------------------------------------------------------------------------------------------------
     fig1[j], ax2 =  plt.subplots(figsize=(30, 20), dpi=100)
     fig1[j].patch.set_alpha(0.5)
     # ax2.invert_yaxis()
