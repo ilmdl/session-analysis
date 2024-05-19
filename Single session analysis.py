@@ -3,20 +3,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator)
 from matplotlib import colors
-from matplotlib.ticker import PercentFormatter
 import numpy as np
-from fpdf import FPDF
+from fpdf import FPDF # fpdf2
 import os
 
 SetColors = ['#d6afd2','#f2cadf', '#936daf', '#d6afd2','#f2cadf', '#936daf', '#f2cadf']
 subList = ['ENGLISH', 'KISWA', 'MATHS', 'HYGIENE', 'ENVIRON', 'C.R.E', 'ACM', 'Total Marks', 'Average']
-BaskFont = r'C:\Users\ILMBL\AppData\Local\Microsoft\Windows\Fonts\Baskerville-Regular.ttf'
-CalFont = r'C:\Windows\Fonts\Calibri.ttf'
-NumStudents = 28
-positionVariance = ['PSTN','POSITION']
+BaskFont = r'D:\Python\fonts\arial.ttf'
+CalFont = BaskFont
+NumStudents = 26
 NameCol = 'NAME'                                                            # Variable to store the name column
-file = ("1 RED OPENER TERM 1 2022")
-studPosition = positionVariance[0]
+file = ("1 RED OPENER TERM 1 2024")
 
 # Getting data from filename to be used in pdf
 grade, gcolor, session, term, termNum, year = file.split()
@@ -25,12 +22,14 @@ session = session.capitalize()
 term = term.capitalize()
 grade = grade + ' ' + gcolor
 term = term + ' ' + termNum
-file = f'C:/Users/ILMBL/Documents/Projects/Programing/Python/Source file/{file}.xlsx'
+examInformation = f"{grade} {session} {term} {year}"
+examInformationseparated = grade, session, term, year
+file = f'D:\\Python\\Source file\\{file}.xlsx'
 # print(grade, gcolor, session, term, termNum, year, file, sep="\n")
 
 # Setting up the directories to store the final pdf's and the graphs used in them
-Pdfdir = f'PDFs {grade} {session} {term} {year}/'
-Datadir = f'Data {grade} {session} {term} {year}/'
+Pdfdir = f'{examInformation} PDFs\\'
+Datadir = f'{examInformation} Data\\'
 if not os.path.exists(Pdfdir): os.makedirs(Pdfdir)       # Create a new directory because it does not exist 
 if not os.path.exists(Datadir): os.makedirs(Datadir)     # Create a new directory because it does not exist 
 
@@ -41,6 +40,7 @@ cleanData = data
 cleanData = cleanData.drop(cleanData.index[-1])
 cleanData = cleanData.drop(cleanData.index[-1])
 if not(subList[6] in cleanData.columns ): cleanData.loc[:,subList[6]] = 0   # Adding column for calculated subject if it doesn't exist
+
 def hex_to_rgb(value):                                                      # Function to convert a hex value to rgb
     value = value.lstrip('#')
     lv = len(value)
@@ -63,67 +63,80 @@ cleanData = cleanData.drop(cleanData.index[0])                                  
 cleanData = cleanData.sort_values(by="Total Marks", ascending=False)
 cleanData['Position'] = list(range(1,NumStudents))
 NumStudents -= 1
-studentData = cleanData[subList[:7]]                                                                            # Dataframe containing only the marks for each student
+studentData = cleanData[subList + ['Position']]                                                                            # Dataframe containing only the marks for each student
 
 # Finding the class average for each subject
 SubjectAverages = []
 for i in subList:
     SubjectAverages.append(round(cleanData[i].mean(),1))
+SubjectAverages = pd.Series(SubjectAverages, index=subList)
 
+# Turning the student data int 3 columns subject, score and frequency the purpose is to make a dataframe for the scatter plot
+FrequencyTable = pd.DataFrame()
+for column in range(7) :
+    StudentDataSorted = sorted(studentData[subList[column]])
+    freak = studentData[subList[column]].value_counts()
+    for row in range(NumStudents):
+        val = 26 * column
+        FrequencyTable.loc[val+row,'Subject'] = subList[column]
+        FrequencyTable.loc[val+row,'Score'] = studentData.iloc[row,column]
+        FrequencyTable.loc[val+row,'freak'] = freak[studentData.iloc[row,column]]
+plt.rcParams['font.size'] = 40
 
-# Output
-Fig = list(range(NumStudents))
-fig1 = list(range(NumStudents))
-
-def CreatePairBarChart(XAxisLables, singleStudentDataXaxis, ClassDataXaxis):    # Create bar chart
-    Figure, axis = plt.subplots(figsize=(35, 20), dpi=40)
-    Figure.patch.set_alpha(0.5)
+# Creating charts
+def CreateBarChart(XAxisLables, singleStudentDataXaxis, ClassDataXaxis, exportFoldernameBarChart, UniqueFileName, chartsize=1):    # Create bar chart
+    Figure, axis = plt.subplots(figsize=(32, 21), dpi=40)
+    # Figure.patch.set_alpha(0.5)
 
     #Bar chart style------
     axis.grid(True, linestyle='solid', color = "white")     # Show grid behind bars
     axis.set_facecolor('#f2cadf')                           # Set plot backgroud
+    plt.rcParams['font.size'] = 40
     # axis.patch.set_alpha(0.6)                           
 
     # Bar chart customization
     ticks = np.arange(0,101,5)                                     # Setting Y axis values to start from 0 increase in steps of five and end at 100
-    axis.set_ylim(0,100)                                                
-    axis.set_yticks(ticks, lenght=30)
-    axis.set_yticklabels(ticks, rotation=0, ha='right', fontsize=37)
-    axis.set_xticks([0,1,2,3,4,5,6], lenght=30)
+    axis.set_ylim(0,100)         
+    axis.set_xticks([0,1,2,3,4,5,6])
     axis.set_xticklabels(XAxisLables, fontsize=50)
+    axis.set_yticks(ticks)
+    axis.set_yticklabels(ticks, rotation=0, ha='right', fontsize=37)
     axis.xaxis.set_minor_locator(MultipleLocator(1))
-    axis.tick_params('both', length=5, width=1, which='major')
+    axis.tick_params('both', length=30, width=1, which='major')
     axis.set_axisbelow(True)
 
     # Plot Bar chart------------------------------------------------------------
-    axis.bar(XAxisLables, singleStudentDataXaxis, width=-0.4, align='edge', label='Student marks', color = "#d6afd2")    # Students Data
-    axis.bar(XAxisLables, ClassDataXaxis, width=0.4, align='edge', label='Class avearge', color = "#936daf")   # Class average
+    if chartsize == 2 : 
+        axis.bar(XAxisLables, singleStudentDataXaxis, width=-0.4, align='edge', label='Student marks', color = "#936daf")    # Students Data
+        axis.bar(XAxisLables, ClassDataXaxis, width=0.4, align='edge', label='Class avearge', color = "#d6afd2")   # Class average
+    if chartsize == 1 : 
+        axis.bar(XAxisLables, singleStudentDataXaxis, label='Student marks', color = "#936daf")    # Students Data
     axis.legend(bbox_to_anchor = (1.01,1.15), loc='upper right')                                                    # Legend
 
-    Figure.savefig(f'Data {grade} {session} {term} {year}\{SplitFormatedNames} bar.png', facecolor=Figure.get_facecolor())    # Save bar chart
+    # Figure.savefig(f'{exportFoldernameBarChart}\\{UniqueFileName} bar.png', facecolor=Figure.get_facecolor())    # Save bar chart
+    Figure.savefig(f'{exportFoldernameBarChart}\\{UniqueFileName} bar.png', bbox_inches='tight', pad_inches = 0)    # Save bar chart
 
-def CreatePieChartBSH(StudentDatatoplot, Colors):  # Create a pie chart with the best subject highlighted
+def CreatePieChartBSH(dataForPiechart, Colors, exportFolderPieChart, UniqueFileName):  # Create a pie chart with the best subject highlighted
     displayData = []
     colorsMost = Colors
-    colorsBest = ['none'] * 7
+    colorsBest = ['none'] * len(dataForPiechart)
     plt.rcParams['font.size'] = 24
 
     # Find and highlight best subject
-    expd = [0] * len(StudentDatatoplot)
-    BestSubjectPositon = np.array(StudentDatatoplot).argmax()
+    expd = [0] * len(dataForPiechart)
+    BestSubjectPositon = np.array(dataForPiechart).argmax()
     expd[BestSubjectPositon] = -0.05
     colorsBest[BestSubjectPositon] = Colors[BestSubjectPositon]
-    colorsMost[BestSubjectPositon] = 'none'
-    
+    # colorsMost[BestSubjectPositon] = 'none'
+
     # Create pie chart
-    Figure1, ax =  plt.subplots(figsize=(20, 7), dpi = 50)
-    wedges, text = ax.pie(StudentDatatoplot, wedgeprops=dict(width=0.5), startangle=90, colors=colorsMost, counterclock=False, shadow=False)
-    wedges1 , text1 = ax.pie(StudentDatatoplot, wedgeprops=dict(width=0.6), startangle=90, colors=colorsBest, counterclock=False, radius=1.1, explode=expd)
+    Figure1, ax =  plt.subplots(figsize=(20, 10), dpi = 70)
+    wedges, text = ax.pie(dataForPiechart, wedgeprops=dict(width=0.5), startangle=90, colors=colorsMost, counterclock=False, shadow=False)
+    ax.pie(dataForPiechart, wedgeprops=dict(width=0.6), startangle=90, colors=colorsBest, counterclock=False, radius=1.1, explode=expd)
     
-    # Customize chart
+    # Customize anotated boxes
     bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.72)
-    kw = dict(arrowprops=dict(arrowstyle="<|-",facecolor='black', linewidth=2),
-            bbox=bbox_props, zorder=0, va="center")
+    kw = dict(arrowprops=dict(arrowstyle="<|-",facecolor='black', linewidth=2), bbox=bbox_props, zorder=0, va="center")
 
     # Annotating wedges--------
     for i, p in enumerate(wedges):
@@ -139,27 +152,224 @@ def CreatePieChartBSH(StudentDatatoplot, Colors):  # Create a pie chart with the
         if not(colorsBest[i] == 'none'):
             x *= 1.05
             y *= 1.05
-        displayData.insert(i, f'{StudentDatatoplot.index[i]}: {StudentDatatoplot[i]} marks\n{round(StudentDatatoplot[i]/StudentDatatoplot.sum()*100,1)}%')  # Box data
+        displayData.insert(i, f'{dataForPiechart.index[i]}: {dataForPiechart.iloc[i]} marks\n{round(dataForPiechart.iloc[i]/dataForPiechart.sum()*100,1)}%')  # Box data
         ax.annotate(displayData[i], xy=(x, y), xytext=(1.35*np.sign(x), 1.3*y), horizontalalignment=horizontalalignment, **kw)              # Create annotaion box 
 
     # Save the charts
-    Figure1.savefig(f'Data {grade} {session} {term} {year}\{SplitFormatedNames} pie.png', transparent = True)     # Pie chart
+    Figure1.savefig(f'{exportFolderPieChart}\\{UniqueFileName} pie.png', transparent = True)     # Pie chart
 
-def CreatePDF (cleanData):
+def CreatePieChartLMIS(dataForPiechart, Colors, exportFolderPieChart, UniqueFileName):  # Create a pie chart with the best subject highlighted
+    displayData = []
+    colorsMost = []
+    lostmarkscolor = '#c23616'
+    datawithLostmarks = []
+    colorsBest = ['none'] * len(dataForPiechart)
+    plt.rcParams['font.size'] = 24
+
+    # Find and highlight best subject
+    expd = [0] * len(dataForPiechart)
+    BestSubjectPositon = np.array(dataForPiechart).argmax()
+    expd[BestSubjectPositon] = -0.05
+    colorsBest[BestSubjectPositon] = Colors[BestSubjectPositon]
+
+    # Lost marks with subject
+    for j, i in enumerate(dataForPiechart):
+        datawithLostmarks.extend([i, 100-i])
+        colorsMost.extend([Colors[j], lostmarkscolor])
+
+    # Create pie chart
+    Figure1, ax =  plt.subplots(figsize=(14, 7), dpi = 70)
+    wedges, text = ax.pie(datawithLostmarks, wedgeprops=dict(width=0.5), startangle=90, colors=colorsMost, counterclock=False, shadow=False)
+    
+    # Customize chart
+    bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.72)
+    kw = dict(arrowprops=dict(arrowstyle="<|-",facecolor='black', linewidth=2), bbox=bbox_props, zorder=0, va="center")
+
+    # Annotating wedges--------
+    for i, p in enumerate(wedges):
+        if not(colorsMost[i] == lostmarkscolor):
+            # Getting the Arc midpoint of each wedge
+            i /= 2
+            i = int(i)
+            ang = (p.theta2 - p.theta1)/2. + p.theta1   # Wedge midpoint angle
+            y = np.sin(np.deg2rad(ang))                 # Calculating the y coordinats of arc midpoint
+            x = np.cos(np.deg2rad(ang))                 # Calculating the x coordinats of arc midpoint
+
+            horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(x))]
+            connectionstyle = f"angle, angleA=0, angleB={ang}"
+            kw["arrowprops"].update({"connectionstyle": connectionstyle})
+            # Annotating wedges that are not the best subject
+            # if not(colorsBest[i] == 'none'):
+            #     x *= 1.05
+            #     y *= 1.05
+            displayData.insert(i, f'{dataForPiechart.index[i]}: {dataForPiechart.iloc[i]} marks\n{round(dataForPiechart.iloc[i]/dataForPiechart.sum()*100,1)}%')  # Box data
+            ax.annotate(displayData[i], xy=(x, y), xytext=(1.35*np.sign(x), 1.3*y), horizontalalignment=horizontalalignment, **kw)              # Create annotaion box 
+
+    # Save the charts
+    Figure1.savefig(f'{exportFolderPieChart}\\{UniqueFileName} pie.png', bbox_inches='tight', pad_inches = 0, transparent = True)     # Pie chart
+
+def CreatePieChartLMIT(dataForPiechart, chartColors, exportFolderPieChart, UniqueFileName):  # Create a pie chart with the best subject highlighted
+    displayData = []
+    colorsMost = []
+    lostmarkscolor = '#c23616'
+    datawithLostmarks = []
+    colorsBest = ['none'] * len(dataForPiechart)
+    plt.rcParams['font.size'] = 24
+
+    # Find and highlight best subject
+    expd = [0] * len(dataForPiechart)
+    BestSubjectPositon = np.array(dataForPiechart).argmax()
+    expd[BestSubjectPositon] = -0.05
+    colorsBest[BestSubjectPositon] = chartColors[BestSubjectPositon]
+
+    datawithLostmarks.extend(dataForPiechart)
+    datawithLostmarks.append(700-dataForPiechart.sum())
+    colorsMost.extend(chartColors)
+    colorsMost.append(lostmarkscolor)
+    # Lost marks with subject
+    # for j, i in enumerate(dataForPiechart):
+    #     datawithLostmarks.append(100-i)
+    #     colorsMost.append(lostmarkscolor)
+
+    # Create pie chart
+    Figure1, ax =  plt.subplots(figsize=(16, 7), dpi = 70)
+    wedges, text = ax.pie(datawithLostmarks, wedgeprops=dict(width=0.5), startangle=90, colors=colorsMost, counterclock=False, shadow=False)
+    
+    # Customize chart
+    bbox_props = dict(boxstyle="square,pad=0.3", fc="w", ec="k", lw=0.72)
+    kw = dict(arrowprops=dict(arrowstyle="<|-",facecolor='black', linewidth=2), bbox=bbox_props, zorder=0, va="center")
+
+    # Annotating wedges--------
+    for i, p in enumerate(wedges):
+        if not(colorsMost[i] == lostmarkscolor):
+            # Getting the Arc midpoint of each wedge
+            ang = (p.theta2 - p.theta1)/2. + p.theta1   # Wedge midpoint angle
+            y = np.sin(np.deg2rad(ang))                 # Calculating the y coordinats of arc midpoint
+            x = np.cos(np.deg2rad(ang))                 # Calculating the x coordinats of arc midpoint
+
+            horizontalalignment = {-1: "right", 1: "left"}[int(np.sign(x))]
+            connectionstyle = f"angle, angleA=0, angleB={ang}"
+            kw["arrowprops"].update({"connectionstyle": connectionstyle})
+            displayData.insert(i, f'{dataForPiechart.index[i]}: {dataForPiechart.iloc[i]} marks\n{round(dataForPiechart.iloc[i]/dataForPiechart.sum()*100,1)}%')  # Box data
+            ax.annotate(displayData[i], xy=(x, y), xytext=(1.35*np.sign(x), 1.3*y), horizontalalignment=horizontalalignment, **kw)              # Create annotaion box 
+    plt.tight_layout()
+    # Save the charts
+    Figure1.savefig(f'{exportFolderPieChart}\\{UniqueFileName} pie.png', transparent = True)     # Pie chart
+
+def CreateScatterplot(scatterTableToPlot, exportFoldernameScatter, UniqueFileName):
+    Figure, axes =  plt.subplots(figsize=(30, 20), dpi=60)
+
+    # Style scatter plot
+    plt.rcParams['font.size'] = 40
+    axes.grid(True, linestyle='solid', color = "black")
+    axes.set_axisbelow(True)
+    axes.yaxis.set_minor_locator(MultipleLocator(1))
+    axes.set_title("Spread of marks per subject size indicates frequency")
+    axes.set_xlabel("Subjects",fontsize=30)
+    axes.set_ylabel("Marks",fontsize=30)
+
+    # axes.bar(subList[:7], SubjectAverages[:7], width=0.4, align='edge', label='Class avearge', color = "#d6afd2")   # Class average
+    # axes.plot(subList[:7], SubjectAverages[:7],"_", lw = 100)
+    axes.scatter(scatterTableToPlot['Subject'],scatterTableToPlot['Score'],  s=((scatterTableToPlot['freak']+1)*8)**2,  c=-(scatterTableToPlot['freak']-18)**6) # Plot scatter plot
+    axes.scatter(subList[:7], SubjectAverages[:7], s = 6000, c="red", lw=5, marker='_', label="Class Average")
+    plt.tight_layout()
+
+    Figure.savefig(f'{exportFoldernameScatter}\\{UniqueFileName} scat.png', transparent = True)                 # Save scatter plot
+    # Figure.savefig(f'{exportFoldernameScatter}\\{UniqueFileName} scat.png', bbox_inches='tight', pad_inches = 0, transparent = True)                 # Save scatter plot
+
+def CreateHistogram(HistogramData, exportFoldernameHistogram, UniqueFileName):
+    figt4,axes = plt.subplots(figsize= (20,15), dpi=70)
+
+    # Variables
+    HisHeight = round(HistogramData.value_counts().max() + 1)
+    n_bins = len(HistogramData.value_counts())
+    xticcks = np.arange(0,101,5)
+    yticcks = np.arange(0,HisHeight,1)
+    
+    # Style
+    plt.rcParams['font.size'] = 30
+    axes.set_title("frequency of marks across all subjects")
+    axes.set_xlabel("Marks")
+    axes.set_ylabel("Frequency")
+    axes.grid(True, linestyle='solid', color = "lightgrey")
+    axes.set_axisbelow(True)
+    axes.set_ylim(0,HisHeight)
+    axes.set_yticks(yticcks)
+    axes.set_yticklabels(yticcks, rotation=0, ha='right', fontsize=20)
+    axes.set_xlim(0,100)
+    axes.yaxis.set_minor_locator(MultipleLocator(1))
+    axes.set_xticks(xticcks)
+    axes.set_xticklabels(xticcks, rotation=0, ha='center', fontsize=20)
+
+    N, bins, patches = axes.hist(HistogramData, bins = n_bins)
+    
+    # Setting color
+    fracs = ((N**(1 / 2)) / N.max())
+    norm = colors.Normalize(fracs.min(), fracs.max())
+    for thisfrac, thispatch in zip(fracs, patches):
+        color = plt.cm.viridis(norm(thisfrac))
+        thispatch.set_facecolor(color)
+    plt.tight_layout()
+
+    figt4.savefig(f'{exportFoldernameHistogram}\\{UniqueFileName} histogram.png', transparent = True)   # Histogram
+    # figt4.savefig(f'{exportFoldernameHistogram}\\{UniqueFileName} histogram.png', bbox_inches='tight', pad_inches = 0, transparent = True)   # Histogram
+
+def newplot2(Studentdatframe, ClassAverages, subjectstaught, numberofgraphs, exportfoldernameBar2, UniqueFileName):
+    remeinder = NumStudents % numberofgraphs
+    studentset = round((NumStudents - remeinder)/numberofgraphs)
+    if remeinder != 0 : numberofgraphs += 1
+    lastLoopChecker = studentset
+    fig, axis = plt.subplots(numberofgraphs, figsize=(40,60), dpi=30)
+    unique_values = np.arange(0,101,5)
+    axis[0].set_title("All student data marked by color")
+    plt.rcParams['font.size'] = 40
+    for l in range(numberofgraphs):
+        axis[l].grid(True, linestyle='solid', color = "lightgrey")
+        axis[l].set_axisbelow(True)
+        barWidth = 0.09
+        ind = np.arange(7)
+        spread = [0, -barWidth, barWidth, -2*barWidth, 2*barWidth, -3*barWidth, 3*barWidth, -4*barWidth, 4*barWidth, -5*barWidth, 5*barWidth]
+        if l == numberofgraphs-1 and remeinder!= 0 : lastLoopChecker = remeinder*1
+        # loopset= Studentdatframe.iloc[l*studentset:(l*studentset)+studentset,[1,2,3,4,5,6,9]]
+        # lowsetscore = loopset.min(axis=None)-5
+        # unique_values = set()
+        # for col in loopset:
+        #     unique_values.update(loopset[col].unique())
+        # unique_values = list(unique_values)
+        # unique_values = sorted(unique_values)
+        
+        for i in range(lastLoopChecker):
+            studentlist = []
+            studentlist.extend(Studentdatframe.iloc[l*studentset + i,[1,2,3,4,5,6,9]].round())
+            axis[l].set_xticks([0,1,2,3,4,5,6])
+            axis[l].set_ylim([0,100])
+            axis[l].set_yticks(unique_values)
+            axis[l].set_xticklabels(subjectstaught)
+            # axis.plot(studentlist, label=cleanData.iloc[i,0], lw=4)
+            axis[l].bar(ind+spread[i], studentlist, label=Studentdatframe.iloc[l*studentset + i,0], width=barWidth)
+        axis[l].scatter(subjectstaught, ClassAverages, s = 20000, c="red", lw=5, marker='_')
+        axis[l].scatter(subjectstaught, ClassAverages, s = 10000, c="red", lw=5, marker='_', label="Class Average")
+        axis[l].legend(bbox_to_anchor=(1, 1.05), loc='upper left')
+    # fig.suptitle("All student data marked by color")
+    plt.tight_layout()
+    fig.savefig(f'{exportfoldernameBar2}\\{UniqueFileName} classBarCombined.png')    # Save bar chart
+
+def CreatePDF (studentDataToDisplay, fullNamesSeparated, FullNamesCombines, ImportDatalocation, charts, exportfolderPDF, Sessiondata, includePosition=True):  # Creating PDF's
     # Setup
     pdf = FPDF('P', 'mm', format='A4')                                      # Create PDF object, set orientation to potrait and units to milimeters
     pdf.add_page()                                                          # Add page to pdf
-    pdf.add_font('calibr', '', CalFont)                                     # Add font
-    pdf.add_font('Baskerville-Regular', '', BaskFont)                       # Add font
+    # pdf.add_font('calibr', 'Regular', fontA)                                     # Add font
+    # pdf.add_font('Baskerville-Regular', '', fontB)                       # Add font
     pdf.set_margins(left=20, top=25, right=20)                              # Setup margins
     pdf.set_author('Mrs Theuri')
     pdf.set_producer('Ilmdl')
-    pdf.set_title(f'{" ".join(SplitFormatedNames)} {session} {term} {year} Exam data analysis')
+    pdf.set_title(f'{FullNamesCombines} Exam data analysis')
     pdf.set_lang('English')
 
     # Variables
-    borderState = False                                                  # Controls text border visibility
-    DisplayNames = f'{SplitFormatedNames[0]} {SplitFormatedNames[1]}'   # Student first and second
+    borderState = False                                                 # Controls text border visibility
+    DisplayNames = f'{fullNamesSeparated[0]} {fullNamesSeparated[1]}'   # Student first and second
+    rectangleHeight = 20
 
     # Functions
     def roundRec(Posx, Posy, height, width, roundness) :                    # Draw a rectangle rounded on one side
@@ -174,40 +384,55 @@ def CreatePDF (cleanData):
         pdf.rect(x=Posx+width-(roundness/2), y=Posy+(roundness/2), w=roundness/2, h=height-roundness, style="F")
 
     # Header
-    pdf.set_font('Baskerville-Regular', '', 24)                                                         # Set font and size
-    pdf.multi_cell(130, 10, f'{DisplayNames}', border=borderState, new_y='Top')                           # Place names
-    pdf.set_font('calibr', '', 15)                                                                      # Set font and size
-    row1names = pdf.get_string_width(DisplayNames) - 3                                                    # Get string width based on font
-    pdf.multi_cell(40, 6, f'{session} {term}\n{year}' , border=borderState, new_y='Next', new_x='LMARGIN', align='R')   # Place exam session, term number and year
+    pdf.set_font('Helvetica', '', 24)                                                                                                     # Set font and size
+    pdf.multi_cell(130, 10, f'{DisplayNames}', border=borderState, new_y='Top')                                                                     # Place names
+    pdf.set_font('Helvetica', '', 15)                                                                                                                  # Set font and size
+    pdf.multi_cell(40, 6, f'{Sessiondata[1]} {Sessiondata[2]}\n{Sessiondata[3]}' , border=borderState, new_y='Next', new_x='LMARGIN', align='R')    # Place exam session, term number and year
     
     # Draw line
+    row1names = pdf.get_string_width(DisplayNames) + 30        # Get string width based on font
     pdf.set_draw_color(r=242, g=202, b=223)
     pdf.set_line_width(1)
-    pdf.line(x1=20, y1=35, x2=25+row1names, y2=35)
+    pdf.line(x1=20, y1=35, x2=20+row1names, y2=35)
 
     # Place data
-    roundRec(20,48,20,42,10) # Make rectange
-    pdf.set_font('helvetica', '', 12)                                                                           # Set font and size
-    pdf.cell(45, 13, "", border=borderState, new_y='Next', new_x='LMARGIN')                                     # Spacing
-    pdf.cell(45, 5.5, f'Mean score: {cleanData[subList[8]][1]}', border=borderState, new_y='Next', new_x='LMARGIN') # Place mean
-    pdf.cell(45, 5.5, f'Total score: {cleanData[subList[7]][1]}', border=borderState, new_y='Next', new_x='LMARGIN')  # Place Total marks
-    pdf.cell(45, 5.5, f'Position: {cleanData["Position"][1]}', border=borderState, new_y='Next', new_x='LMARGIN')  # Place position
+    pdf.cell(45, 13, "", border=borderState, new_y='Next', new_x='LMARGIN')                                                             # Spacing
+    if not(includePosition) : rectangleHeight *= 2/3
+    rectangleX = pdf.get_x()
+    rectangleY = pdf.get_y() - 2
+    roundRec(rectangleX, rectangleY, rectangleHeight, 42, 10) # Make rectange
+    pdf.set_font('helvetica', '', 12)                                                                                                   # Set font and size
+    pdf.cell(45, 5.5, f'Mean score: {studentDataToDisplay.iloc[-2]}', border=borderState, new_y='Next', new_x='LMARGIN')                     # Place mean
+    pdf.cell(45, 5.5, f'Total score: {studentDataToDisplay.iloc[-3]}', border=borderState, new_y='Next', new_x='LMARGIN')                    # Place Total marks
+    if includePosition : pdf.cell(45, 5.5, f'Position: {studentDataToDisplay.iloc[-1]}', border=borderState, new_y='Next', new_x='LMARGIN')  # Place position
     
     # Insert charts
-    pdf.image(f'Data {grade} {session} {term} {year}\{SplitFormatedNames} pie.png', 20, 65, w=pdf.epw) # Place pie chart
-    pdf.image(f'Data {grade} {session} {term} {year}\{SplitFormatedNames} bar.png', 20, 160, w=pdf.epw) # Place bar chart
+    for insertchart in charts :
+        pdf.image(f'{ImportDatalocation}\\{FullNamesCombines} {insertchart}.png', w=pdf.epw) # Place pie chart
+        pdf.cell(45, 3, "", border=borderState, new_y='Next', new_x='LMARGIN')                                                             # Spacing
 
-    pdf.output(f'PDFs {grade} {session} {term} {year}\{" ".join(SplitFormatedNames)} {session} {term} {year}.pdf') # Output pdf
+    pdf.output(f'{exportfolderPDF}\\{FullNamesCombines}.pdf') # Output pdf
 
 #----------------------------------------------------------------------Creating student PDF---------------------------------------------------------------------------------------
+chartsToUse = ["pie", "bar", "scat", "histogram", "classBarCombined"]
+for i in range(0):
+    fullNames = cleanData.iloc[i,0]                                                         # Student names
+    SplitFormatedNames = [singleNames.capitalize() for singleNames in fullNames.split()]            # Student names as a list with only the firt letter capital
+    SingleStudentData = studentData.iloc[i]
+    stringNames = " ".join(SplitFormatedNames)
+    insertCharts = [f'{Datadir}\\{stringNames} bar.png']
 
-# Student data to print on pdf and to use for loc--------------------------------------------------------------
-fullNames = cleanData.iloc[1,0]                                                         # Student names
-SplitFormatedNames = [singleNames.capitalize() for singleNames in fullNames.split()]            # Student names as a list with only the firt letter capital
-SingleStudentData = studentData.iloc[1]
+    CreateBarChart([subject.capitalize() for subject in subList[:7]], SingleStudentData[:7], SubjectAverages[:7], Datadir, stringNames, 2)
+    CreatePieChartLMIT(SingleStudentData[:7], SetColors, Datadir, stringNames)
+    CreatePDF(SingleStudentData, SplitFormatedNames, stringNames, Datadir, chartsToUse[:2], Pdfdir, examInformationseparated)
+    plt.close()
+    print(f"student {i} done")
 
-CreatePairBarChart([subject.capitalize() for subject in subList[:7]], SingleStudentData, SubjectAverages[:7])
-CreatePieChartBSH(SingleStudentData, SetColors)
-CreatePDF(cleanData)
-
-plt.show()
+# Teacher stuff
+CreateBarChart([subject.capitalize() for subject in subList[:7]], SubjectAverages[:7], SubjectAverages[:7], Datadir, examInformation)
+CreatePieChartLMIT(SubjectAverages[:7], SetColors, Datadir, examInformation)
+CreateScatterplot(FrequencyTable, Datadir, examInformation)
+CreateHistogram(FrequencyTable['Score'], Datadir, examInformation)
+newplot2(cleanData, SubjectAverages[:7],subList[:7], 5, Datadir, examInformation)
+CreatePDF(SubjectAverages, examInformationseparated, examInformation, Datadir, chartsToUse, Pdfdir, examInformationseparated, False)
+# plt.show()
